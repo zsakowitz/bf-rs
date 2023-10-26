@@ -1,3 +1,5 @@
+//! Provides a cell wrapping a boolean value at runtime.
+
 use crate::builder::tracking::TrackingBuilder;
 
 use super::u8::CellU8;
@@ -7,6 +9,7 @@ use std::{
 };
 
 #[derive(Debug)]
+/// A cell containing a boolean value which is guaranteed to either be zero or one.
 pub struct CellBool<'a, const N: usize>(
     /// Invariant: this cell must always contain either a zero or a one once any algorithm finishes.
     pub(super) CellU8<'a, N>,
@@ -17,6 +20,7 @@ impl<'a, const N: usize> CellBool<'a, N> {
         self.0.memory.builder.borrow_mut()
     }
 
+    /// Executes code while this cell is true.
     pub fn while_true(&self, f: impl FnOnce()) {
         {
             let mut builder = self.borrow_builder_mut();
@@ -33,6 +37,7 @@ impl<'a, const N: usize> CellBool<'a, N> {
         }
     }
 
+    /// Executes code if this cell is true.
     pub fn if_true(self, f: impl FnOnce()) {
         {
             let mut builder = self.borrow_builder_mut();
@@ -50,28 +55,34 @@ impl<'a, const N: usize> CellBool<'a, N> {
         }
     }
 
+    /// Sets the value of this cell.
     pub fn set(&mut self, value: bool) {
         self.0.set(value as u8);
     }
 
+    /// Negates the value contained in this cell.
     pub fn negate(&mut self) {
         let mut temp = self.0.clone();
         self.0.set(1);
         self.0.sub_and_zero(&mut temp);
     }
 
+    /// Moves the value of this cell into another cell, leaving a `false` behind in this cell.
     pub fn move_into(&mut self, other: &mut CellBool<N>) {
         self.0.move_into(&mut other.0);
     }
 
+    /// Moves the value of another cell into this cell, leaving a `false` behind in the other cell.
     pub fn move_from(&mut self, other: &mut CellBool<N>) {
         self.0.move_from(&mut other.0);
     }
 
+    /// Copies the value of this cell into another cell.
     pub fn copy_into(&self, other: &mut CellBool<N>) {
         self.0.copy_into(&mut other.0);
     }
 
+    /// Copies the value of another cell into this cell.
     pub fn copy_from(&mut self, other: &CellBool<N>) {
         self.0.copy_from(&other.0);
     }

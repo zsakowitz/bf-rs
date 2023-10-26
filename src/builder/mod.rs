@@ -1,5 +1,5 @@
-pub mod allocating;
+//! Builders that allow Brainf*** programs to be easily programatically created.
+
+pub mod allocator;
 pub mod core;
-pub mod old_allocating;
-pub mod old_allocating_2;
 pub mod tracking;

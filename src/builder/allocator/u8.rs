@@ -1,3 +1,5 @@
+//! Provides a cell wrapping a `u8` value at runtime.
+
 use super::{
     bool::CellBool,
     core::AllocatingBuilder,
@@ -10,6 +12,7 @@ use std::{
 };
 
 #[derive(Debug)]
+/// A cell containing an unsigned 8-bit value.
 pub struct CellU8<'a, const N: usize> {
     pub(super) memory: &'a AllocatingBuilder<N>,
     pub(super) location: usize,
@@ -20,48 +23,56 @@ impl<'a, const N: usize> CellU8<'a, N> {
         self.memory.builder.borrow_mut()
     }
 
-    pub fn read(&self) {
+    /// Reads a value from input into this cell.
+    pub fn read(&mut self) {
         let mut builder = self.borrow_builder_mut();
         builder.goto(self.location);
         builder.read();
     }
 
+    /// Writes the value from this cell into output.
     pub fn write(&self) {
         let mut builder = self.borrow_builder_mut();
         builder.goto(self.location);
         builder.write();
     }
 
+    /// Sets the value of this cell to zero.
     pub fn zero(&mut self) {
         let mut builder = self.borrow_builder_mut();
         builder.goto(self.location);
         builder.zero();
     }
 
+    /// Sets the value of this cell to a `u8` value.
     pub fn set(&mut self, value: u8) {
         let mut builder = self.borrow_builder_mut();
         builder.goto(self.location);
         builder.set(value);
     }
 
+    /// Increments the value of this cell.
     pub fn inc(&mut self) {
         let mut builder = self.borrow_builder_mut();
         builder.goto(self.location);
         builder.inc();
     }
 
+    /// Increments the value of this cell by a `u8` value.
     pub fn inc_by(&mut self, value: u8) {
         let mut builder = self.borrow_builder_mut();
         builder.goto(self.location);
         builder.inc_by(value);
     }
 
+    /// Decrements the value of this cell.
     pub fn dec(&mut self) {
         let mut builder = self.borrow_builder_mut();
         builder.goto(self.location);
         builder.dec();
     }
 
+    /// Decrements the value of this cell by a `u8` value.
     pub fn dec_by(&mut self, value: u8) {
         let mut builder = self.borrow_builder_mut();
         builder.goto(self.location);
@@ -86,14 +97,17 @@ impl<'a, const N: usize> CellU8<'a, N> {
         });
     }
 
+    /// Moves the value of this cell into another cell, leaving a `0` behind in this cell.
     pub fn move_into(&mut self, other: &mut CellU8<N>) {
         self.move_into_all_locations([other.location]);
     }
 
+    /// Moves the value of another cell into this cell, leaving a `0` behind in the other cell.
     pub fn move_from(&mut self, other: &mut CellU8<N>) {
         other.move_into(self);
     }
 
+    /// Copies the value of this cell into another cell.
     pub fn copy_into(&self, other: &mut CellU8<N>) {
         let mut temp = self.memory.u8_uninit();
 
@@ -120,6 +134,7 @@ impl<'a, const N: usize> CellU8<'a, N> {
         temp.move_into_all_locations([self.location, other.location]);
     }
 
+    /// Copies the value of another cell into this cell.
     pub fn copy_from(&mut self, other: &CellU8<N>) {
         other.copy_into(self);
     }
@@ -146,6 +161,7 @@ impl<'a, const N: usize> CellU8<'a, N> {
         });
     }
 
+    /// Returns a `CellBool` indicating if `self` is nonzero.
     pub fn is_nonzero(self) -> CellBool<'a, N> {
         let output = self.memory.bool(false);
         let mut builder = self.borrow_builder_mut();
@@ -157,6 +173,7 @@ impl<'a, const N: usize> CellU8<'a, N> {
         output
     }
 
+    /// Returns a `CellBool` indicating if `self` is zero.
     pub fn is_zero(self) -> CellBool<'a, N> {
         let output = self.memory.bool(true);
         let mut builder = self.borrow_builder_mut();

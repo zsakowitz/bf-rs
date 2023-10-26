@@ -1,6 +1,9 @@
+//! A runner for Brainf*** programs.
+
 use std::fmt::Debug;
 
 #[derive(Clone, Hash, PartialEq, Eq)]
+/// A runner that only permits access to its internal data through standard Brainf*** commands.
 pub struct Runner<const N: usize> {
     data: [u8; N],
     index: usize,
@@ -9,6 +12,7 @@ pub struct Runner<const N: usize> {
 }
 
 impl<const N: usize> Runner<N> {
+    /// Constructs a new runner given input bytes.
     pub fn new(input: &[u8]) -> Self {
         if N == 0 {
             panic!("cannot make a runner of size 0");
@@ -25,14 +29,17 @@ impl<const N: usize> Runner<N> {
         }
     }
 
+    /// Increments the current cell.
     pub fn inc(&mut self) {
         self.data[self.index] = self.data[self.index].wrapping_add(1);
     }
 
+    /// Decrements the current cell.
     pub fn dec(&mut self) {
         self.data[self.index] = self.data[self.index].wrapping_sub(1);
     }
 
+    /// Moves the pointer to the left.
     pub fn shl(&mut self) {
         if self.index == 0 {
             self.index = N - 1
@@ -41,6 +48,7 @@ impl<const N: usize> Runner<N> {
         }
     }
 
+    /// Moves the pointer to the right.
     pub fn shr(&mut self) {
         if self.index == N - 1 {
             self.index = 0
@@ -49,14 +57,17 @@ impl<const N: usize> Runner<N> {
         }
     }
 
+    /// Reads a value from input into the current cell.
     pub fn read(&mut self) {
         self.data[self.index] = self.input.pop().unwrap_or(0);
     }
 
+    /// Writes the value of the current cell into output.
     pub fn write(&mut self) {
         self.output.push(self.data[self.index]);
     }
 
+    /// Repeats the inner code while the current cell is nonzero.
     pub fn repeat(&mut self, mut f: impl FnMut(&mut Self)) {
         let initial_index = self.index;
 

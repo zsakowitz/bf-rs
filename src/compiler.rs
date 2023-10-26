@@ -1,3 +1,5 @@
+//! A compiler for Brainf*** programs.
+
 use crate::runner::Runner;
 
 #[derive(Clone, Debug)]
@@ -55,18 +57,19 @@ fn parse(source: &str) -> Result<Program, &'static str> {
 }
 
 #[derive(Clone, Debug)]
+/// A parsed program.
 pub struct Program {
     instructions: Vec<Instruction>,
 }
 
 impl Program {
+    /// Attempts to parse a program source, returning an error if it is malformed.
     pub fn new(source: &str) -> Result<Self, &'static str> {
         parse(source)
     }
 
+    /// Runs the program on a given input, outputting a `Runner` once complete.
     pub fn run<const N: usize>(&self, input: &[u8]) -> Runner<N> {
-        let mut runner = Runner::new(input);
-
         fn run<const N: usize>(runner: &mut Runner<N>, list: &Vec<Instruction>) {
             for instruction in list {
                 match instruction {
@@ -80,6 +83,8 @@ impl Program {
                 }
             }
         }
+
+        let mut runner = Runner::new(input);
 
         run(&mut runner, &self.instructions);
 

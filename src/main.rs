@@ -1,4 +1,8 @@
-use crate::builder::allocating::{core::AllocatingBuilder, ops::eq::PartialEq};
+//! Hi
+
+#![deny(missing_docs)]
+
+use crate::builder::allocator::{core::AllocatingBuilder, ops::eq::PartialEq};
 
 pub mod builder;
 pub mod compiler;
