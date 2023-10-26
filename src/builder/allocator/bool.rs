@@ -21,14 +21,31 @@ impl<'a, const N: usize> CellBool<'a, N> {
     }
 
     /// Executes code while this cell is true.
-    pub fn while_true(&self, f: impl FnOnce()) {
+    pub fn while_true(&self, f: impl FnOnce(&Self)) {
         {
             let mut builder = self.borrow_builder_mut();
             builder.goto(self.0.location);
             builder.source_mut().push('[');
         }
 
-        f();
+        f(self);
+
+        {
+            let mut builder = self.borrow_builder_mut();
+            builder.goto(self.0.location);
+            builder.source_mut().push(']');
+        }
+    }
+
+    /// Executes code while this cell is true.
+    pub fn while_true_mut(&mut self, f: impl FnOnce(&mut Self)) {
+        {
+            let mut builder = self.borrow_builder_mut();
+            builder.goto(self.0.location);
+            builder.source_mut().push('[');
+        }
+
+        f(self);
 
         {
             let mut builder = self.borrow_builder_mut();
@@ -38,21 +55,11 @@ impl<'a, const N: usize> CellBool<'a, N> {
     }
 
     /// Executes code if this cell is true.
-    pub fn if_true(self, f: impl FnOnce()) {
-        {
-            let mut builder = self.borrow_builder_mut();
-            builder.goto(self.0.location);
-            builder.source_mut().push('[');
-        }
-
-        f();
-
-        {
-            let mut builder = self.borrow_builder_mut();
-            builder.goto(self.0.location);
-            builder.zero();
-            builder.source_mut().push(']');
-        }
+    pub fn if_true(mut self, f: impl FnOnce()) {
+        self.while_true_mut(|this| {
+            f();
+            this.0.zero();
+        });
     }
 
     /// Sets the value of this cell.

@@ -8,7 +8,7 @@ use super::{
 use crate::builder::tracking::TrackingBuilder;
 use std::{
     cell::RefMut,
-    ops::{Add, AddAssign, Neg, Sub, SubAssign},
+    ops::{Add, AddAssign, MulAssign, Neg, Sub, SubAssign},
 };
 
 #[derive(Debug)]
@@ -79,27 +79,48 @@ impl<'a, const N: usize> CellU8<'a, N> {
         builder.dec_by(value);
     }
 
-    /// `others` must be guaranteed to contain valid memory locations.
-    fn move_into_all_locations<const U: usize>(&mut self, others: [usize; U]) {
-        let mut builder = self.borrow_builder_mut();
-
-        for other in others {
-            builder.goto(other);
-            builder.zero();
+    /// Creates a loop while this cell value is nonzero.
+    pub fn while_nonzero(&self, f: impl FnOnce(&Self)) {
+        {
+            let mut builder = self.borrow_builder_mut();
+            builder.goto(self.location);
+            builder.source_mut().push('[');
         }
 
-        builder.repeat_at(self.location, |builder| {
-            builder.dec();
-            for other in others {
-                builder.goto(other);
-                builder.inc();
-            }
-        });
+        f(self);
+
+        {
+            let mut builder = self.borrow_builder_mut();
+            builder.goto(self.location);
+            builder.source_mut().push(']');
+        }
+    }
+
+    /// Creates a loop while this cell value is nonzero.
+    pub fn while_nonzero_mut(&mut self, f: impl FnOnce(&mut Self)) {
+        {
+            let mut builder = self.borrow_builder_mut();
+            builder.goto(self.location);
+            builder.source_mut().push('[');
+        }
+
+        f(self);
+
+        {
+            let mut builder = self.borrow_builder_mut();
+            builder.goto(self.location);
+            builder.source_mut().push(']');
+        }
     }
 
     /// Moves the value of this cell into another cell, leaving a `0` behind in this cell.
     pub fn move_into(&mut self, other: &mut CellU8<N>) {
-        self.move_into_all_locations([other.location]);
+        other.zero();
+
+        self.while_nonzero_mut(|this| {
+            this.dec();
+            other.inc();
+        })
     }
 
     /// Moves the value of another cell into this cell, leaving a `0` behind in the other cell.
@@ -109,29 +130,28 @@ impl<'a, const N: usize> CellU8<'a, N> {
 
     /// Copies the value of this cell into another cell.
     pub fn copy_into(&self, other: &mut CellU8<N>) {
-        let mut temp = self.memory.u8_uninit();
+        let temp = self.memory.u8(0);
 
-        {
-            let other: &mut CellU8<N> = &mut temp;
+        // We have to resort to a low-level implementation here because all the methods that we need
+        // mutate `self`, but we only have a regular reference.
 
-            let others = [other.location];
-            let mut builder = self.borrow_builder_mut();
+        let mut builder = self.borrow_builder_mut();
 
-            for other in others {
-                builder.goto(other);
-                builder.zero();
-            }
+        // This moves `self` into `temp`, leaving `self` as 0.
+        builder.repeat_at(self.location, |builder| {
+            builder.dec();
+            builder.goto(temp.location);
+            builder.inc();
+        });
 
-            builder.repeat_at(self.location, |builder| {
-                builder.dec();
-                for other in others {
-                    builder.goto(other);
-                    builder.inc();
-                }
-            });
-        }
-
-        temp.move_into_all_locations([self.location, other.location]);
+        // This moves `temp` into `self` and `other`, leaving it as 0.
+        builder.repeat_at(temp.location, |builder| {
+            builder.dec();
+            builder.goto(self.location);
+            builder.inc();
+            builder.goto(other.location);
+            builder.inc();
+        });
     }
 
     /// Copies the value of another cell into this cell.
@@ -141,47 +161,41 @@ impl<'a, const N: usize> CellU8<'a, N> {
 
     /// Adds the value of `other` into `self`, zeroing `other` in the process.
     pub fn add_and_zero(&mut self, other: &mut CellU8<N>) {
-        let mut builder = self.borrow_builder_mut();
-
-        builder.repeat_at(other.location, |builder| {
-            builder.dec();
-            builder.goto(self.location);
-            builder.inc();
+        other.while_nonzero_mut(|other| {
+            self.inc();
+            other.dec();
         });
     }
 
     /// Subtracts the value of `other` from `self`, zeroing `other` in the process.
     pub fn sub_and_zero(&mut self, other: &mut CellU8<N>) {
-        let mut builder = self.borrow_builder_mut();
-
-        builder.repeat_at(other.location, |builder| {
-            builder.dec();
-            builder.goto(self.location);
-            builder.dec();
+        other.while_nonzero_mut(|other| {
+            self.dec();
+            other.dec();
         });
     }
 
     /// Returns a `CellBool` indicating if `self` is nonzero.
-    pub fn is_nonzero(self) -> CellBool<'a, N> {
-        let output = self.memory.bool(false);
-        let mut builder = self.borrow_builder_mut();
-        builder.repeat_at(self.location, |builder| {
-            builder.zero();
-            builder.goto(output.0.location);
-            builder.inc();
+    pub fn is_nonzero(mut self) -> CellBool<'a, N> {
+        let mut output = self.memory.bool(false);
+
+        self.while_nonzero_mut(|this| {
+            this.zero();
+            output.0.inc();
         });
+
         output
     }
 
     /// Returns a `CellBool` indicating if `self` is zero.
-    pub fn is_zero(self) -> CellBool<'a, N> {
-        let output = self.memory.bool(true);
-        let mut builder = self.borrow_builder_mut();
-        builder.repeat_at(self.location, |builder| {
-            builder.zero();
-            builder.goto(output.0.location);
-            builder.dec();
+    pub fn is_zero(mut self) -> CellBool<'a, N> {
+        let mut output = self.memory.bool(true);
+
+        self.while_nonzero_mut(|this| {
+            this.zero();
+            output.0.dec();
         });
+
         output
     }
 }
@@ -415,8 +429,6 @@ impl<'a, const N: usize> Neg for CellU8<'a, N> {
     }
 }
 
-// u8 == (&)CellU8
-
 impl<'a, const N: usize> PartialEq<'a, N, u8> for CellU8<'a, N> {
     fn eq(mut self, other: u8) -> CellBool<'a, N> {
         self -= other;
@@ -446,8 +458,6 @@ impl<'a, const N: usize> PartialEq<'a, N, u8> for &CellU8<'a, N> {
 }
 
 impl<'a, const N: usize> Eq<'a, N, u8> for &CellU8<'a, N> {}
-
-// (&)CellU8 == &CellU8
 
 impl<'a, const N: usize> PartialEq<'a, N> for &CellU8<'a, N> {
     fn eq(self, other: Self) -> CellBool<'a, N> {
@@ -479,8 +489,6 @@ impl<'a, const N: usize> PartialEq<'a, N, CellU8<'a, N>> for &CellU8<'a, N> {
 
 impl<'a, const N: usize> Eq<'a, N, CellU8<'a, N>> for &CellU8<'a, N> {}
 
-// (&)CellU8 == CellU8
-
 impl<'a, const N: usize> PartialEq<'a, N, &CellU8<'a, N>> for CellU8<'a, N> {
     fn eq(self, other: &CellU8<'a, N>) -> CellBool<'a, N> {
         let mut output = self.clone();
@@ -510,3 +518,15 @@ impl<'a, const N: usize> PartialEq<'a, N> for CellU8<'a, N> {
 }
 
 impl<'a, const N: usize> Eq<'a, N> for CellU8<'a, N> {}
+
+impl<'a, const N: usize> MulAssign for CellU8<'a, N> {
+    fn mul_assign(&mut self, rhs: Self) {
+        let mut x = self.memory.u8_uninit();
+        x.move_from(self);
+
+        x.while_nonzero_mut(|x| {
+            x.dec();
+            self.add_and_zero(&mut rhs.clone());
+        });
+    }
+}
