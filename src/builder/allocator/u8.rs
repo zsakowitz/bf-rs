@@ -2,13 +2,14 @@
 
 use super::{
     bool::CellBool,
+    cell::IntoCell,
     core::AllocatingBuilder,
     ops::eq::{Eq, PartialEq},
 };
 use crate::builder::tracking::TrackingBuilder;
 use std::{
     cell::RefMut,
-    ops::{Add, AddAssign, MulAssign, Neg, Sub, SubAssign},
+    ops::{Add, AddAssign, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
 #[derive(Debug)]
@@ -197,6 +198,35 @@ impl<'a, const N: usize> CellU8<'a, N> {
         });
 
         output
+    }
+
+    /// Swaps the values of `self` and `other`.
+    pub fn swap(&mut self, other: &mut CellU8<N>) {
+        let mut temp = self.memory.u8_uninit();
+        other.move_into(&mut temp);
+        self.move_into(other);
+        temp.move_into(self);
+    }
+
+    /// Squares `self` in place.
+    pub fn square(&mut self) {
+        let mut temp0 = self.memory.u8_uninit();
+        self.move_into(&mut temp0);
+
+        temp0.while_nonzero_mut(|temp0| {
+            temp0.dec();
+            *self += &*temp0;
+            *self += &*temp0;
+            self.inc();
+        });
+    }
+}
+
+impl<'a, const N: usize> IntoCell<'a, N> for u8 {
+    type Output = CellU8<'a, N>;
+
+    fn into_cell(self, memory: &'a AllocatingBuilder<N>) -> Self::Output {
+        memory.u8(self)
     }
 }
 
@@ -519,14 +549,115 @@ impl<'a, const N: usize> PartialEq<'a, N> for CellU8<'a, N> {
 
 impl<'a, const N: usize> Eq<'a, N> for CellU8<'a, N> {}
 
-impl<'a, const N: usize> MulAssign for CellU8<'a, N> {
-    fn mul_assign(&mut self, rhs: Self) {
+impl<'a, const N: usize> MulAssign<&CellU8<'a, N>> for CellU8<'a, N> {
+    fn mul_assign(&mut self, rhs: &CellU8<'a, N>) {
         let mut x = self.memory.u8_uninit();
         x.move_from(self);
 
         x.while_nonzero_mut(|x| {
             x.dec();
-            self.add_and_zero(&mut rhs.clone());
+            *self += rhs;
         });
+    }
+}
+
+impl<'a, const N: usize> MulAssign for CellU8<'a, N> {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self *= &rhs;
+    }
+}
+
+impl<'a, const N: usize> Mul for CellU8<'a, N> {
+    type Output = CellU8<'a, N>;
+
+    fn mul(mut self, rhs: Self) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl<'a, const N: usize> Mul<CellU8<'a, N>> for &CellU8<'a, N> {
+    type Output = CellU8<'a, N>;
+
+    fn mul(self, mut rhs: CellU8<'a, N>) -> Self::Output {
+        rhs *= self;
+        rhs
+    }
+}
+
+impl<'a, const N: usize> Mul<&CellU8<'a, N>> for CellU8<'a, N> {
+    type Output = CellU8<'a, N>;
+
+    fn mul(mut self, rhs: &CellU8<'a, N>) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+
+impl<'a, const N: usize> Mul for &CellU8<'a, N> {
+    type Output = CellU8<'a, N>;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.clone() * rhs
+    }
+}
+
+impl<'a, const N: usize> DivAssign<&CellU8<'a, N>> for CellU8<'a, N> {
+    fn div_assign(&mut self, rhs: &CellU8<'a, N>) {
+        let mut temp0 = self.memory.u8(0);
+        let mut temp1 = self.memory.u8(0);
+        let mut temp2 = self.memory.u8(0);
+        let mut temp3 = self.memory.u8(0);
+        let mut rhs = rhs.clone();
+
+        self.while_nonzero_mut(|this| {
+            temp0.inc();
+            this.dec();
+        });
+
+        temp0.while_nonzero_mut(|temp0| {
+            rhs.while_nonzero_mut(|y| {
+                temp1.inc();
+                temp2.inc();
+                y.dec();
+            });
+
+            temp2.while_nonzero_mut(|temp2| {
+                rhs.inc();
+                temp2.dec();
+            });
+
+            temp1.while_nonzero_mut(|temp1| {
+                temp2.inc();
+                temp0.dec();
+
+                temp0.while_nonzero_mut(|temp0| {
+                    temp2.zero();
+                    temp3.inc();
+                    temp0.dec();
+                });
+
+                temp3.while_nonzero_mut(|temp3| {
+                    temp0.inc();
+                    temp3.dec();
+                });
+
+                temp2.while_nonzero_mut(|temp2| {
+                    temp1.dec();
+                    temp1.while_nonzero_mut(|temp1| {
+                        self.dec();
+                        temp1.zero();
+                    });
+                    temp1.inc();
+                    temp2.dec();
+                });
+
+                temp1.dec();
+            });
+
+            self.inc();
+        });
+
+        // x/y = (x-y)/y
     }
 }

@@ -79,6 +79,11 @@ impl<const N: usize> Runner<N> {
             }
         }
     }
+
+    /// Consumes the runner, outputting its inner contents.
+    pub fn into_inner(self) -> ([u8; N], usize, Vec<u8>, Vec<u8>) {
+        (self.data, self.index, self.input, self.output)
+    }
 }
 
 struct RunnerData<'a>(&'a [u8], usize);

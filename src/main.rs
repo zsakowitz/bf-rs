@@ -1,5 +1,4 @@
-//! Hi
-
+#![doc = ""]
 #![deny(missing_docs)]
 
 use crate::builder::allocator::core::AllocatingBuilder;
@@ -9,14 +8,14 @@ pub mod compiler;
 pub mod runner;
 
 fn main() -> Result<(), &'static str> {
-    let builder = AllocatingBuilder::<30_000>::new();
+    let builder = AllocatingBuilder::<65536>::new();
 
-    let mut a = builder.u8(4);
-    let b = builder.u8(7);
-    a *= b;
+    let a = builder.u8(32);
+    let mut b = builder.u8(7);
+    b *= a;
 
-    let runner = builder.run(b"")?;
-    println!("{runner:?}");
+    println!("{}", builder.source());
+    println!("{:#?}", builder.run(b"hello")?);
 
     Ok(())
 }

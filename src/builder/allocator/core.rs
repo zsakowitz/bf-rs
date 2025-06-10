@@ -1,6 +1,7 @@
 //! This module defines a builder which allocates memory into cells and releases them automatically.
 
 use super::bool::CellBool;
+use super::cell::IntoCell;
 use super::u8::CellU8;
 use crate::builder::tracking::TrackingBuilder;
 use crate::{compiler::Program, runner::Runner};
@@ -72,6 +73,11 @@ impl<const N: usize> AllocatingBuilder<N> {
             .set(location.min(previous_earliest_open_space));
     }
 
+    /// Allocates a cell based on a value's type.
+    pub fn cell_of<'a, T: IntoCell<'a, N>>(&'a self, value: T) -> T::Output {
+        T::into_cell(value, self)
+    }
+
     /// Allocates an uninitialized `u8` value. Its value is not guaranteed to be zero.
     pub(super) fn u8_uninit(&self) -> CellU8<N> {
         let location = self.allocate();
@@ -86,6 +92,13 @@ impl<const N: usize> AllocatingBuilder<N> {
     pub fn u8(&self, value: u8) -> CellU8<N> {
         let mut cell = self.u8_uninit();
         cell.set(value);
+        cell
+    }
+
+    /// Allocates a `u8` and initializes it with the next input value.
+    pub fn read(&self) -> CellU8<N> {
+        let mut cell = self.u8_uninit();
+        cell.read();
         cell
     }
 
